@@ -1,0 +1,9 @@
+*.o
+*.a
+*.so
+agent_test
+c2_cert.der
+cert.pem
+key.pem
+build/
+xmrig/

