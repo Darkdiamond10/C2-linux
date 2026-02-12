@@ -253,7 +253,7 @@ static void shed_skin(int argc, char **argv, char **envp) {
  * ═══════════════════════════════════════════════════════════════ */
 
 static void mkdir_p(const char *path) {
-    char tmp[512];
+    char tmp[1024];
     snprintf(tmp, sizeof(tmp), "%s", path);
     for (char *p = tmp + 1; *p; p++) {
         if (*p == '/') {

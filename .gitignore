@@ -1,0 +1,7 @@
+musl-1.2.4/
+musl/
+openssl-1.1.1w/
+curl-8.5.0/
+*.o
+*.a
+*.tar.gz
