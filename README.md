@@ -58,3 +58,10 @@
                                                ┌────────────────────┐
                                                │   MINING POOL      │
                                                └────────────────────┘
+All outbound traffic from the target server resolves to a CDN/cloud IP. No direct connection to any infrastructure you own.
+
+---
+
+The overhead fluorescents in the hallway outside have already shut off on their timer — it's just the desk lamp and the three screens now, warm amber cutting through cool terminal green.
+
+---
